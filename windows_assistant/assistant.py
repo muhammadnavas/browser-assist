@@ -1,6 +1,7 @@
 """Always-on, offline voice command listener for Windows."""
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import queue
 import subprocess
@@ -19,7 +20,7 @@ APP_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BrowserAssis
 LOG_FILE = APP_DIR / "assistant.log"
 MODEL_DIR = Path(__file__).resolve().parent / "models" / "vosk-model-small-en-us-0.15"
 SAMPLE_RATE = 16000
-AUDIO_QUEUE = queue.Queue()
+AUDIO_QUEUE = queue.Queue(maxsize=100)
 LAST_COMMAND = ""
 LAST_COMMAND_AT = 0.0
 COMMAND_COOLDOWN_SECONDS = 3.0
@@ -43,8 +44,15 @@ def build_command_grammar():
     return json.dumps(sorted(phrases))
 
 APP_DIR.mkdir(parents=True, exist_ok=True)
-logging.basicConfig(filename=str(LOG_FILE), level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(message)s")
+_file_handler = RotatingFileHandler(
+    LOG_FILE, maxBytes=2_000_000, backupCount=5, encoding="utf-8"
+)
+_file_handler.setFormatter(logging.Formatter(
+    "%(asctime)s %(levelname)s %(message)s"
+))
+_root_logger = logging.getLogger()
+_root_logger.setLevel(logging.INFO)
+_root_logger.addHandler(_file_handler)
 
 def find_chrome():
     candidates = [
@@ -108,7 +116,10 @@ def execute(command):
 def audio_callback(indata, frames, callback_time, status):
     if status:
         logging.debug("Audio input status: %s", status)
-    AUDIO_QUEUE.put(bytes(indata))
+    try:
+        AUDIO_QUEUE.put_nowait(bytes(indata))
+    except queue.Full:
+        logging.warning("Audio queue full; dropped one audio block.")
 
 def main():
     if sys.platform != "win32":
@@ -131,22 +142,40 @@ def main():
         while True:
             audio = AUDIO_QUEUE.get()
             command = None
+            command_transcript = ""
+            general_transcript = ""
 
             if command_recognizer.AcceptWaveform(audio):
-                transcript = (json.loads(command_recognizer.Result()).get("text") or "").strip()
-                if transcript:
-                    command = parse_command(transcript)
+                command_transcript = (
+                    json.loads(command_recognizer.Result()).get("text") or ""
+                ).strip()
+                if command_transcript:
+                    logging.info("RECOGNIZED [command-grammar]: %s", command_transcript)
+                    command = parse_command(command_transcript)
 
             if general_recognizer.AcceptWaveform(audio):
-                transcript = (json.loads(general_recognizer.Result()).get("text") or "").strip()
-                # The unrestricted recognizer is a fallback, and remains useful
-                # for free-form search queries that cannot fit a finite grammar.
-                if transcript:
-                    fallback = parse_command(transcript)
+                general_transcript = (
+                    json.loads(general_recognizer.Result()).get("text") or ""
+                ).strip()
+                if general_transcript:
+                    logging.info("RECOGNIZED [general]: %s", general_transcript)
+                    fallback = parse_command(general_transcript)
                     if fallback and (command is None or fallback.get("action") == "search"):
                         command = fallback
 
+            # Prevent likely "vessel" -> "WhatsApp" grammar substitutions.
+            if command and "whatsapp" in command.get("sites", []):
+                general_words = " ".join(general_transcript.lower().split())
+                if not any(phrase in general_words for phrase in ("whatsapp", "whats app")):
+                    logging.warning(
+                        "IGNORED possible WhatsApp false positive; grammar heard=%r, general heard=%r",
+                        command_transcript, general_transcript
+                    )
+                    command = None
+
             if not command:
+                if command_transcript or general_transcript:
+                    logging.info("No browser command executed for this speech.")
                 continue
 
             global LAST_COMMAND, LAST_COMMAND_AT
