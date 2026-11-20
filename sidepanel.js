@@ -1,4 +1,3 @@
-const micButton = document.getElementById("micButton");
 const micLabel = document.getElementById("micLabel");
 const micIcon = document.getElementById("micIcon");
 const heardText = document.getElementById("heardText");
@@ -13,17 +12,22 @@ const settingsStatus = document.getElementById("settingsStatus");
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let isListening = false;
+let isStarting = false;
+let autoListen = true;
+let permissionTabOpened = false;
+let restartTimer = null;
 
 function setListening(value) {
   isListening = value;
-  micButton.disabled = false;
-  micLabel.textContent = value ? "Listening..." : "Start listening";
+  micLabel.textContent = value ? "Listening automatically" : "Preparing microphone...";
   micIcon.textContent = value ? "◉" : "🎙";
   orb.classList.toggle("active", value);
   statusDot.classList.toggle("listening", value);
-  statusDot.title = value ? "Listening" : "Ready";
-  headline.textContent = value ? "I'm listening..." : "What can I do for you?";
-  subheadline.textContent = value ? "Speak clearly. I'm ready." : "Tap the microphone and tell me what to open.";
+  statusDot.title = value ? "Listening" : "Connecting";
+  headline.textContent = value ? "I'm listening..." : "Getting ready to listen...";
+  subheadline.textContent = value
+    ? "Just say a command, such as “Open ChatGPT”."
+    : "Voice recognition will start automatically.";
 }
 
 function addHistory(command, result) {
@@ -48,12 +52,12 @@ async function execute(command, originalText) {
     if (!response?.ok) throw new Error(response?.error || "Command failed.");
     heardText.textContent = response.message;
     headline.textContent = "Done!";
-    subheadline.textContent = "Ready for your next command.";
+    subheadline.textContent = "I'll keep listening for your next command.";
     addHistory(originalText, "Completed");
   } catch (error) {
     heardText.textContent = error.message;
     headline.textContent = "Couldn't do that";
-    subheadline.textContent = "Try another command.";
+    subheadline.textContent = "I'll keep listening. Try another command.";
     addHistory(originalText, "Failed");
   }
 }
@@ -77,7 +81,7 @@ async function handleTranscript(transcript) {
       } catch (error) {
         heardText.textContent = error.message;
         headline.textContent = "Couldn't understand";
-        subheadline.textContent = "Try a simpler command or check AI settings.";
+        subheadline.textContent = "I'll keep listening for another command.";
         addHistory(text, "Not understood");
         return;
       }
@@ -85,9 +89,9 @@ async function handleTranscript(transcript) {
   }
 
   if (!command) {
-    heardText.textContent = "I didn't recognize that. Try “Open GitHub” or “Search for JavaScript promises”.";
+    heardText.textContent = "I didn't recognize that. Try “Open ChatGPT” or “Search for JavaScript promises”.";
     headline.textContent = "Command not recognized";
-    subheadline.textContent = "You can enable Gemini for more flexible requests.";
+    subheadline.textContent = "I'll keep listening for another command.";
     addHistory(text, "Not recognized");
     return;
   }
@@ -95,93 +99,107 @@ async function handleTranscript(transcript) {
 }
 
 function openPermissionTab() {
+  if (permissionTabOpened) return;
+  permissionTabOpened = true;
   chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") });
 }
 
-// Watch for microphone permission changes
-if (navigator.permissions && navigator.permissions.query) {
-  navigator.permissions.query({ name: "microphone" }).then(status => {
-    status.onchange = () => {
-      if (status.state === "granted") {
-        heardText.textContent = "Microphone access enabled! Click 'Start listening' to speak.";
-        headline.textContent = "What can I do for you?";
-        subheadline.textContent = "Tap the microphone and tell me what to open.";
-      }
-    };
-  }).catch(() => {});
+function scheduleRestart(delay = 700) {
+  if (!autoListen || restartTimer) return;
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    startRecognition();
+  }, delay);
 }
 
 async function startRecognition() {
+  if (!autoListen || isListening || isStarting) return;
   if (!SpeechRecognition) {
-    heardText.textContent = "Speech recognition isn't available in this Chrome environment. Try the supported desktop Chrome browser.";
-    return;
-  }
-  if (isListening) {
-    recognition?.stop();
+    heardText.textContent = "Speech recognition isn't available here. Please use desktop Chrome.";
+    headline.textContent = "Speech recognition unavailable";
     return;
   }
 
-  // Chrome Side Panel does not display permission prompts. If not granted, open permission tab.
-  if (navigator.permissions && navigator.permissions.query) {
-    try {
-      const perm = await navigator.permissions.query({ name: "microphone" });
-      if (perm.state !== "granted") {
-        heardText.innerHTML = 'Microphone permission needed. Opening permission tab...<br><a href="#" id="permLink" style="color:#58d6d0;text-decoration:underline;margin-top:6px;display:inline-block;">Click here if tab didn\'t open</a>';
-        document.getElementById("permLink")?.addEventListener("click", (e) => {
-          e.preventDefault();
-          openPermissionTab();
-        });
+  isStarting = true;
+  try {
+    if (navigator.permissions?.query) {
+      const permission = await navigator.permissions.query({ name: "microphone" });
+      if (permission.state !== "granted") {
+        isStarting = false;
+        setListening(false);
+        heardText.textContent = "Allow microphone access once in the tab Chrome opened. Listening will then start automatically.";
         openPermissionTab();
+        permission.onchange = () => {
+          if (permission.state === "granted") {
+            permissionTabOpened = false;
+            startRecognition();
+          }
+        };
         return;
       }
-    } catch (e) {
-      // Continue to try start() if permissions query fails
     }
-  }
 
-  recognition = new SpeechRecognition();
-  recognition.lang = "en-IN";
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
-  let finalTranscript = "";
+    const currentRecognition = new SpeechRecognition();
+    recognition = currentRecognition;
+    currentRecognition.lang = "en-IN";
+    currentRecognition.continuous = false;
+    currentRecognition.interimResults = true;
+    currentRecognition.maxAlternatives = 1;
+    let finalTranscript = "";
 
-  recognition.onstart = () => setListening(true);
-  recognition.onresult = event => {
-    let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript;
-      if (event.results[i].isFinal) finalTranscript += transcript;
-      else interim += transcript;
-    }
-    heardText.textContent = finalTranscript || interim || "Listening...";
-  };
-  recognition.onerror = event => {
-    setListening(false);
-    if (event.error === "not-allowed") {
-      heardText.innerHTML = 'Microphone permission was blocked. <a href="#" id="permLink" style="color:#58d6d0;text-decoration:underline;">Click here to grant access in a new tab</a>.';
-      document.getElementById("permLink")?.addEventListener("click", (e) => {
-        e.preventDefault();
-        openPermissionTab();
-      });
-      openPermissionTab();
-      return;
-    }
-    const messages = {
-      "no-speech": "I didn't hear anything. Please try again.",
-      "network": "Speech recognition needs a network connection in this browser."
+    currentRecognition.onstart = () => {
+      isStarting = false;
+      setListening(true);
     };
-    heardText.textContent = messages[event.error] || `Speech recognition error: ${event.error}`;
-  };
-  recognition.onend = async () => {
-    setListening(false);
-    if (finalTranscript.trim()) await handleTranscript(finalTranscript);
-  };
 
-  try { recognition.start(); }
-  catch (error) { setListening(false); heardText.textContent = error.message; }
+    currentRecognition.onresult = event => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) finalTranscript += transcript + " ";
+        else interim += transcript;
+      }
+      heardText.textContent = finalTranscript.trim() || interim || "Listening...";
+    };
+
+    currentRecognition.onerror = event => {
+      if (recognition !== currentRecognition) return;
+      isStarting = false;
+      setListening(false);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        heardText.textContent = "Microphone access was blocked. Allow it in Chrome site settings, then reopen the side panel.";
+        autoListen = false;
+        return;
+      }
+      const messages = {
+        "no-speech": "I didn't hear anything. Still listening...",
+        "network": "Speech recognition needs an internet connection. I'll retry when possible.",
+        "audio-capture": "No microphone was found. Check your microphone connection."
+      };
+      heardText.textContent = messages[event.error] || `Speech recognition issue: ${event.error}. Retrying...`;
+    };
+
+    currentRecognition.onend = async () => {
+      if (recognition !== currentRecognition) return;
+      recognition = null;
+      isStarting = false;
+      setListening(false);
+      if (finalTranscript.trim()) await handleTranscript(finalTranscript);
+      scheduleRestart(900);
+    };
+
+    currentRecognition.start();
+  } catch (error) {
+    isStarting = false;
+    setListening(false);
+    heardText.textContent = `Couldn't start voice recognition: ${error.message}`;
+    scheduleRestart(2000);
+  }
 }
 
-micButton.addEventListener("click", startRecognition);
+// Start hands-free listening as soon as the side panel loads.
+startRecognition();
+
 document.querySelectorAll("[data-command]").forEach(button => {
   button.addEventListener("click", () => {
     const text = button.dataset.command;
