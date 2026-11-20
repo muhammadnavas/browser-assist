@@ -121,7 +121,7 @@ browser-assist/
 ## Privacy and limitations
 
 - The Windows assistant continuously accesses the microphone while it is running. Use the stop script or disable its Startup shortcut whenever you do not want it listening.
-- Vosk performs speech recognition locally using the downloaded model. The assistant logs recognised text and command execution details locally; it does not save raw microphone audio.
+- Vosk performs speech recognition locally using the downloaded model. The assistant does not save raw microphone audio or log unrelated speech; it logs command actions and errors locally.
 - Commands are limited to the built-in site allowlist and supported browser actions.
 - English recognition is configured by the included small English model. Other languages require a compatible Vosk model and configuration changes.
 - This is a local desktop application. It does not require Vercel, Render, or paid hosting.
