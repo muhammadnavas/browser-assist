@@ -40,9 +40,14 @@ def build_command_grammar():
         "next tab", "switch to next tab", "previous tab", "switch to previous tab",
         "last tab", "search", "search for", "search google for",
         "google search for",
+        "next", "close", "closing",
         "next one four three", "next one forty three",
         "next one hundred forty three", "next one hundred and forty three",
         "next one forty tree", "next one four tree", "next 143",
+        "close one four three", "close one forty three",
+        "close one hundred forty three", "close one hundred and forty three",
+        "close one forty tree", "close one four tree", "close 143",
+        "closing one four three", "closing one forty three", "closing 143",
         "[unk]",
     })
     return json.dumps(sorted(phrases))
@@ -71,9 +76,10 @@ def is_wake_phrase(transcript):
 
 def is_close_wake_phrase(transcript):
     normalized = " ".join((transcript or "").lower().split())
-    if not normalized.startswith("next "):
-        return False
-    return normalized[5:] in WAKE_VARIANTS
+    for prefix in ("next ", "close ", "closing "):
+        if normalized.startswith(prefix):
+            return normalized[len(prefix):] in WAKE_VARIANTS
+    return False
 
 APP_DIR.mkdir(parents=True, exist_ok=True)
 _file_handler = RotatingFileHandler(
@@ -191,6 +197,8 @@ def main():
     active = False
     command_recognizer = None
     general_recognizer = None
+    close_pending_until = 0.0
+    CLOSE_SEQUENCE_SECONDS = 5.0
 
     print('Browser Assist is in standby. Say "143" to activate; say "next 143" to deactivate.')
 
@@ -246,9 +254,31 @@ def main():
                     logging.info("RECOGNIZED [general]: %s", general_transcript)
                     general_command = parse_command(general_transcript)
 
-            # "next 143" returns to standby before the normal command parser runs.
-            if is_close_wake_phrase(command_transcript) or is_close_wake_phrase(general_transcript):
+            # Some Vosk utterance boundaries split "next 143" into two results.
+            # Remember a standalone "next"/"close" briefly, then treat a following
+            # spoken 143 as the close sequence. Also accept the complete phrase.
+            transcripts = [command_transcript, general_transcript]
+            close_prefix_heard = any(
+                transcript.strip().lower() in ("next", "close", "closing")
+                for transcript in transcripts if transcript
+            )
+            close_number_heard = any(
+                is_wake_phrase(transcript) for transcript in transcripts if transcript
+            )
+            complete_close_heard = any(
+                is_close_wake_phrase(transcript) for transcript in transcripts if transcript
+            )
+            now = time.monotonic()
+            if close_prefix_heard:
+                close_pending_until = now + CLOSE_SEQUENCE_SECONDS
+                logging.info("Close sequence prefix detected; waiting up to %s seconds for 143.",
+                             CLOSE_SEQUENCE_SECONDS)
+
+            if complete_close_heard or (
+                close_pending_until and now <= close_pending_until and close_number_heard
+            ):
                 active = False
+                close_pending_until = 0.0
                 command_recognizer = None
                 general_recognizer = None
                 wake_recognizer = KaldiRecognizer(
