@@ -9,9 +9,11 @@ $ZipPath = Join-Path $env:TEMP "$ModelName.zip"
 
 Write-Host "Setting up Browser Assist Windows background listener..."
 if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-    throw "Python 3.10+ is required. Install it from https://www.python.org/downloads/windows/ and enable the Python launcher."
+    throw "Python 3.11 is required. Install it from https://www.python.org/downloads/release/python-3119/ and enable the Python launcher."
 }
-if (-not (Test-Path $Venv)) { py -3 -m venv $Venv }
+py -3.11 --version
+if ($LASTEXITCODE -ne 0) { throw "Python 3.11 was not found. Install Python 3.11 and retry." }
+if (-not (Test-Path $Venv)) { py -3.11 -m venv $Venv }
 & $Python -m pip install --upgrade pip
 & $Python -m pip install -r (Join-Path $Root "requirements.txt")
 
@@ -34,5 +36,5 @@ $Shortcut.Description = "Browser Assist continuous voice listener"
 $Shortcut.Save()
 
 Write-Host "Setup complete. Browser Assist will start automatically when you sign in."
-Write-Host "To start it now, run the pythonw.exe command shown in the setup instructions."
+Write-Host "Restart Windows or run .venv\Scripts\python.exe assistant.py to start it now."
 Write-Host "Log file: $env:LOCALAPPDATA\BrowserAssist\assistant.log"
