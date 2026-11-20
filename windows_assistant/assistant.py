@@ -24,6 +24,24 @@ LAST_COMMAND = ""
 LAST_COMMAND_AT = 0.0
 COMMAND_COOLDOWN_SECONDS = 3.0
 
+def build_command_grammar():
+    """Build a finite grammar for common browser commands."""
+    phrases = set()
+    open_verbs = ("open", "please open", "launch", "go to", "visit")
+    for aliases in __import__("commands").ALIASES:
+        for alias in aliases[1]:
+            for verb in open_verbs:
+                phrases.add(f"{verb} {alias}")
+
+    phrases.update({
+        "close tab", "close the tab", "close current tab", "close the current tab",
+        "remove tab", "remove the tab", "remove current tab",
+        "next tab", "switch to next tab", "previous tab", "switch to previous tab",
+        "last tab", "search", "search for", "search google for",
+        "google search for", "[unk]",
+    })
+    return json.dumps(sorted(phrases))
+
 APP_DIR.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(filename=str(LOG_FILE), level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
@@ -100,20 +118,34 @@ def main():
 
     logging.info("Starting continuous voice assistant.")
     model = Model(str(MODEL_DIR))
-    recognizer = KaldiRecognizer(model, SAMPLE_RATE)
-    recognizer.SetWords(False)
+    # The constrained recognizer improves accuracy for known browser commands.
+    # Keep a second unrestricted recognizer so free-form Google searches still work.
+    command_recognizer = KaldiRecognizer(model, SAMPLE_RATE, build_command_grammar())
+    general_recognizer = KaldiRecognizer(model, SAMPLE_RATE)
+    command_recognizer.SetWords(False)
+    general_recognizer.SetWords(False)
     print("Browser Assist is listening continuously. Press Ctrl+C to stop.")
 
     with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=8000, dtype="int16",
                            channels=1, callback=audio_callback):
         while True:
             audio = AUDIO_QUEUE.get()
-            if not recognizer.AcceptWaveform(audio):
-                continue
-            transcript = (json.loads(recognizer.Result()).get("text") or "").strip()
-            if not transcript:
-                continue
-            command = parse_command(transcript)
+            command = None
+
+            if command_recognizer.AcceptWaveform(audio):
+                transcript = (json.loads(command_recognizer.Result()).get("text") or "").strip()
+                if transcript:
+                    command = parse_command(transcript)
+
+            if general_recognizer.AcceptWaveform(audio):
+                transcript = (json.loads(general_recognizer.Result()).get("text") or "").strip()
+                # The unrestricted recognizer is a fallback, and remains useful
+                # for free-form search queries that cannot fit a finite grammar.
+                if transcript:
+                    fallback = parse_command(transcript)
+                    if fallback and (command is None or fallback.get("action") == "search"):
+                        command = fallback
+
             if not command:
                 continue
 
