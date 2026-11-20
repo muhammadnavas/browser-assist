@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Downloaded speech model and runtime logs
+windows_assistant/models/
+*.log
