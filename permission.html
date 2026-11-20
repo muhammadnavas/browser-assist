@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Microphone Permission - Voice Browser Assistant</title>
+  <link rel="stylesheet" href="sidepanel.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: radial-gradient(ellipse at 50% -10%, #20264b 0%, var(--bg) 60%);
+    }
+    .perm-card {
+      background: linear-gradient(155deg, #182341dd, #10182bdd);
+      border: 1px solid #34405d;
+      border-radius: 24px;
+      padding: 40px 32px;
+      max-width: 460px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.4);
+    }
+    .perm-card .brand-mark {
+      margin: 0 auto 16px;
+      font-size: 24px;
+    }
+    .perm-card h1 {
+      font: 600 22px 'Space Grotesk', sans-serif;
+      margin: 0 0 10px;
+      color: var(--text);
+    }
+    .perm-card p {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin: 0 0 24px;
+    }
+    .perm-status {
+      margin-top: 18px;
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 20px;
+    }
+    .help-hint {
+      margin-top: 20px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+      text-align: left;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="perm-card">
+    <div class="brand-mark">🎙</div>
+    <h1>Allow Microphone Access</h1>
+    <p id="desc">Chrome requires granting microphone permission in a normal browser tab before the Voice Assistant side panel can access it.</p>
+    <button class="mic-button" id="grantBtn" type="button">
+      <span>Allow Microphone Access</span>
+    </button>
+    <div class="perm-status" id="permStatus"></div>
+    <div class="help-hint" id="helpHint">
+      <strong>If blocked by Chrome:</strong><br>
+      Click the site settings / tune icon <span style="font-size:14px;">⚙ / 🔒</span> on the left side of the address bar above, change <strong>Microphone</strong> to <strong>Allow</strong>, then refresh this page.
+    </div>
+  </div>
+  <script src="permission.js"></script>
+</body>
+</html>

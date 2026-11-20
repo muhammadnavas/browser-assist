@@ -94,7 +94,24 @@ async function handleTranscript(transcript) {
   await execute(command, text);
 }
 
-function startRecognition() {
+function openPermissionTab() {
+  chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") });
+}
+
+// Watch for microphone permission changes
+if (navigator.permissions && navigator.permissions.query) {
+  navigator.permissions.query({ name: "microphone" }).then(status => {
+    status.onchange = () => {
+      if (status.state === "granted") {
+        heardText.textContent = "Microphone access enabled! Click 'Start listening' to speak.";
+        headline.textContent = "What can I do for you?";
+        subheadline.textContent = "Tap the microphone and tell me what to open.";
+      }
+    };
+  }).catch(() => {});
+}
+
+async function startRecognition() {
   if (!SpeechRecognition) {
     heardText.textContent = "Speech recognition isn't available in this Chrome environment. Try the supported desktop Chrome browser.";
     return;
@@ -102,6 +119,24 @@ function startRecognition() {
   if (isListening) {
     recognition?.stop();
     return;
+  }
+
+  // Chrome Side Panel does not display permission prompts. If not granted, open permission tab.
+  if (navigator.permissions && navigator.permissions.query) {
+    try {
+      const perm = await navigator.permissions.query({ name: "microphone" });
+      if (perm.state !== "granted") {
+        heardText.innerHTML = 'Microphone permission needed. Opening permission tab...<br><a href="#" id="permLink" style="color:#58d6d0;text-decoration:underline;margin-top:6px;display:inline-block;">Click here if tab didn\'t open</a>';
+        document.getElementById("permLink")?.addEventListener("click", (e) => {
+          e.preventDefault();
+          openPermissionTab();
+        });
+        openPermissionTab();
+        return;
+      }
+    } catch (e) {
+      // Continue to try start() if permissions query fails
+    }
   }
 
   recognition = new SpeechRecognition();
@@ -122,8 +157,16 @@ function startRecognition() {
   };
   recognition.onerror = event => {
     setListening(false);
+    if (event.error === "not-allowed") {
+      heardText.innerHTML = 'Microphone permission was blocked. <a href="#" id="permLink" style="color:#58d6d0;text-decoration:underline;">Click here to grant access in a new tab</a>.';
+      document.getElementById("permLink")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        openPermissionTab();
+      });
+      openPermissionTab();
+      return;
+    }
     const messages = {
-      "not-allowed": "Microphone permission was blocked. Allow microphone access and try again.",
       "no-speech": "I didn't hear anything. Please try again.",
       "network": "Speech recognition needs a network connection in this browser."
     };
