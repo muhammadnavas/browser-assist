@@ -121,11 +121,32 @@ def audio_callback(indata, frames, callback_time, status):
     except queue.Full:
         logging.warning("Audio queue full; dropped one audio block.")
 
+def acquire_single_instance():
+    """Prevent multiple assistant processes from competing for the microphone."""
+    import ctypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    handle = kernel32.CreateMutexW(None, False, "Local\\BrowserAssistVoiceAssistant")
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        kernel32.CloseHandle(handle)
+        logging.warning("Another Browser Assist instance is already running; exiting.")
+        return None
+    return handle
+
+
 def main():
     if sys.platform != "win32":
         raise RuntimeError("This assistant is designed for Windows 10/11.")
     if not MODEL_DIR.is_dir():
         raise FileNotFoundError(f"Speech model not found: {MODEL_DIR}. Run setup_windows.ps1 first.")
+
+    mutex_handle = acquire_single_instance()
+    if mutex_handle is None:
+        return
 
     logging.info("Starting continuous voice assistant.")
     model = Model(str(MODEL_DIR))
@@ -142,6 +163,8 @@ def main():
         while True:
             audio = AUDIO_QUEUE.get()
             command = None
+            grammar_command = None
+            general_command = None
             command_transcript = ""
             general_transcript = ""
 
@@ -151,7 +174,7 @@ def main():
                 ).strip()
                 if command_transcript:
                     logging.info("RECOGNIZED [command-grammar]: %s", command_transcript)
-                    command = parse_command(command_transcript)
+                    grammar_command = parse_command(command_transcript)
 
             if general_recognizer.AcceptWaveform(audio):
                 general_transcript = (
@@ -159,28 +182,29 @@ def main():
                 ).strip()
                 if general_transcript:
                     logging.info("RECOGNIZED [general]: %s", general_transcript)
-                    fallback = parse_command(general_transcript)
-                    if fallback and (command is None or fallback.get("action") == "search"):
-                        command = fallback
+                    general_command = parse_command(general_transcript)
 
-            # Only open a website when both independent recognizers agree.
-            # This blocks substitutions such as "Vercel" -> "WhatsApp".
-            if command and command.get("action") == "open_sites":
-                general_command = parse_command(general_transcript)
-                grammar_sites = command.get("sites", [])
-                general_sites = (
-                    general_command.get("sites", [])
-                    if general_command and general_command.get("action") == "open_sites"
-                    else []
+            # The two recognizers finalize speech at different times, so requiring
+            # agreement on every audio block drops valid commands. Prefer the
+            # constrained command grammar; use general recognition as a fallback.
+            command = grammar_command or general_command
+
+            # If both recognizers independently produce valid but different
+            # website commands in the same processing cycle, reject the ambiguity.
+            if (
+                grammar_command
+                and general_command
+                and grammar_command.get("action") == "open_sites"
+                and general_command.get("action") == "open_sites"
+                and grammar_command.get("sites") != general_command.get("sites")
+            ):
+                logging.warning(
+                    "IGNORED conflicting website commands; grammar heard=%r (%s), "
+                    "general heard=%r (%s)",
+                    command_transcript, grammar_command.get("sites", []),
+                    general_transcript, general_command.get("sites", [])
                 )
-                if grammar_sites != general_sites:
-                    logging.warning(
-                        "IGNORED uncertain website command; grammar heard=%r (%s), "
-                        "general heard=%r (%s)",
-                        command_transcript, grammar_sites,
-                        general_transcript, general_sites
-                    )
-                    command = None
+                command = None
 
             if not command:
                 if command_transcript or general_transcript:
