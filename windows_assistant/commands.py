@@ -30,7 +30,8 @@ ALIASES = [
     ("stackoverflow", ("stack overflow", "stackoverflow")),
     ("calendar", ("google calendar", "calendar")),
     ("chatgpt", ("chat g p t", "chat gpt", "chatgpt")),
-    ("linkedin", ("linked in", "linkedin")),
+    # Keep the single-word brand spelling; "linked in" is too easily confused with "lead code".
+    ("linkedin", ("linkedin",)),
     ("leetcode", ("leet code", "leetcode", "lead code")),
     ("youtube", ("you tube", "youtube")),
     ("github", ("git hub", "github")),
