@@ -21,6 +21,7 @@ SITES = {
     "render": "https://dashboard.render.com/",
     "word": "https://www.microsoft365.com/launch/word",
     "portfolio": "https://navas.vercel.app/",
+    "leetcode": "https://leetcode.com/",
 }
 
 # Keep product-specific aliases before generic brand aliases. The parser below
@@ -30,6 +31,7 @@ ALIASES = [
     ("calendar", ("google calendar", "calendar")),
     ("chatgpt", ("chat g p t", "chat gpt", "chatgpt")),
     ("linkedin", ("linked in", "linkedin")),
+    ("leetcode", ("leet code", "leetcode", "lead code")),
     ("youtube", ("you tube", "youtube")),
     ("github", ("git hub", "github")),
     ("keep", ("google keep", "keep")),
