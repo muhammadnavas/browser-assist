@@ -163,13 +163,22 @@ def main():
                     if fallback and (command is None or fallback.get("action") == "search"):
                         command = fallback
 
-            # Prevent likely "vessel" -> "WhatsApp" grammar substitutions.
-            if command and "whatsapp" in command.get("sites", []):
-                general_words = " ".join(general_transcript.lower().split())
-                if not any(phrase in general_words for phrase in ("whatsapp", "whats app")):
+            # Only open a website when both independent recognizers agree.
+            # This blocks substitutions such as "Vercel" -> "WhatsApp".
+            if command and command.get("action") == "open_sites":
+                general_command = parse_command(general_transcript)
+                grammar_sites = command.get("sites", [])
+                general_sites = (
+                    general_command.get("sites", [])
+                    if general_command and general_command.get("action") == "open_sites"
+                    else []
+                )
+                if grammar_sites != general_sites:
                     logging.warning(
-                        "IGNORED possible WhatsApp false positive; grammar heard=%r, general heard=%r",
-                        command_transcript, general_transcript
+                        "IGNORED uncertain website command; grammar heard=%r (%s), "
+                        "general heard=%r (%s)",
+                        command_transcript, grammar_sites,
+                        general_transcript, general_sites
                     )
                     command = None
 
