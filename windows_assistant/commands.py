@@ -48,11 +48,11 @@ ALIASES = [
 
 def normalize(text):
     text = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode()
-    return re.sub(r"\\s+", " ", re.sub(r"[^a-z0-9]+", " ", text.lower())).strip()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", text.lower())).strip()
 
 def _resolve_site(segment):
     """Resolve one complete spoken app name; never match a generic substring."""
-    segment = re.sub(r"^(?:the|my)\\s+", "", segment.strip())
+    segment = re.sub(r"^(?:the|my)\s+", "", segment.strip())
     matches = []
     for site, aliases in ALIASES:
         for alias in aliases:
@@ -67,24 +67,24 @@ def parse_command(transcript):
     text = normalize(transcript)
     if not text:
         return None
-    if re.search(r"\\b(close|remove)\\s+(the\\s+)?(current\\s+)?tab\\b", text):
+    if re.search(r"\b(close|remove)\s+(the\s+)?(current\s+)?tab\b", text):
         return {"action": "close_tab"}
-    if re.search(r"\\b(next|switch to next)\\s+tab\\b", text):
+    if re.search(r"\b(next|switch to next)\s+tab\b", text):
         return {"action": "next_tab"}
-    if re.search(r"\\b(previous|last|switch to previous)\\s+tab\\b", text):
+    if re.search(r"\b(previous|last|switch to previous)\s+tab\b", text):
         return {"action": "previous_tab"}
-    search = re.match(r"^(?:please )?(?:search(?: google)? for|google search for|search)\\s+(.+)$", text)
+    search = re.match(r"^(?:please )?(?:search(?: google)? for|google search for|search)\s+(.+)$", text)
     if search:
         return {"action": "search", "query": search.group(1).strip()}
 
-    opening = re.match(r"^(?:please )?(?:open|launch|go to|visit)\\s+(?:tabs?\\s+)?(.+)$", text)
+    opening = re.match(r"^(?:please )?(?:open|launch|go to|visit)\s+(?:tabs?\s+)?(.+)$", text)
     if not opening:
         return None
 
     # Multiple apps are supported only when the speaker explicitly separates
     # them with "and" / "also". This prevents incidental words from launching tabs.
     target_text = opening.group(1)
-    segments = re.split(r"\\s+(?:and|also)\\s+", target_text)
+    segments = re.split(r"\s+(?:and|also)\s+", target_text)
     found = []
     for segment in segments:
         site = _resolve_site(segment)
