@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Voice Browser Assistant",
+  "version": "1.0.0",
+  "description": "Control Chrome tabs with voice commands.",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel", "storage", "tabs"],
+  "host_permissions": [],
+  "optional_host_permissions": ["https://generativelanguage.googleapis.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Voice Browser Assistant"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "icons": {
+    "16": "icons/icon.svg",
+    "32": "icons/icon.svg",
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
+  }
+}

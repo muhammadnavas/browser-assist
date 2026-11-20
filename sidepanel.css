@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+:root{color-scheme:dark;--bg:#0b1020;--panel:#111a2e;--panel2:#17223a;--line:#26334e;--text:#eef3ff;--muted:#8f9bb3;--accent:#8b7cff;--cyan:#58d6d0}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% -10%,#20264b 0%,var(--bg) 50%);color:var(--text);font-family:'DM Sans',sans-serif}
+.app{padding:22px 18px 16px;max-width:520px;margin:auto;min-height:100vh;display:flex;flex-direction:column;gap:24px}
+.topbar{display:flex;align-items:center;gap:12px}
+.brand-mark{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#8b7cff,#4b9be9);font:700 22px 'Space Grotesk';box-shadow:0 8px 24px #6f66e644}
+h1,h2,h3,p{margin:0}
+h1{font:600 16px 'Space Grotesk'} .topbar p{font-size:11px;color:var(--muted);margin-top:3px}
+.status-dot{margin-left:auto;width:8px;height:8px;border-radius:50%;background:#51d6a1;box-shadow:0 0 12px #51d6a1}
+.status-dot.listening{background:#ff668b;box-shadow:0 0 12px #ff668b}
+.hero{text-align:center;padding:22px 14px 20px;background:linear-gradient(155deg,#182341aa,#10182b99);border:1px solid #34405d;border-radius:24px;box-shadow:0 18px 55px #0003}
+.orb{width:108px;height:108px;margin:0 auto 20px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#b5aaff,#7968ee 42%,#303b83 78%);box-shadow:0 0 0 10px #887aff12,0 0 48px #8173ff55;transition:.2s}
+.orb span{font-size:48px;color:white;transform:rotate(90deg)}
+.orb.active{animation:pulse 1.5s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 20px #ff668b0c,0 0 65px #ff668b88}}
+.hero h2{font:600 20px 'Space Grotesk';letter-spacing:-.4px}
+.hero>p{font-size:12px;color:var(--muted);margin:8px 0 18px}
+.mic-button{border:0;border-radius:14px;padding:13px 20px;background:linear-gradient(100deg,#8b7cff,#5d8cf5);color:white;font:600 13px 'DM Sans';display:inline-flex;align-items:center;gap:9px;cursor:pointer;box-shadow:0 8px 22px #7167ef44}
+.mic-button:disabled{opacity:.6;cursor:wait}
+.heard{margin:16px auto 0;min-height:18px;color:#c3c9dc;font-size:12px;overflow-wrap:anywhere}
+.section{display:flex;flex-direction:column;gap:12px}
+.section-heading{display:flex;align-items:center;justify-content:space-between}
+.section-heading h3{font:600 13px 'Space Grotesk'}
+.section-heading>span,.optional{font-size:9px;letter-spacing:1px;color:#8e86ee;font-weight:700}
+.suggestions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.suggestion{padding:12px 10px;text-align:left;background:#121d33;border:1px solid var(--line);border-radius:12px;color:#dce4f6;font:500 11px 'DM Sans';cursor:pointer;transition:.15s}
+.suggestion:hover{border-color:#8175f4;background:#1a2540}
+.history{display:flex;flex-direction:column;gap:8px}
+.history-item{padding:10px 12px;background:#111a2d;border:1px solid #202d46;border-radius:10px;display:flex;justify-content:space-between;gap:10px;font-size:11px}
+.history-item span:last-child{color:var(--muted);white-space:nowrap}
+.empty{font-size:11px;color:var(--muted);padding:10px 2px}
+.text-button{background:none;border:0;color:#a9a1ff;font:500 11px 'DM Sans';cursor:pointer}
+.settings{border:1px solid var(--line);border-radius:14px;padding:13px;background:#10192b}
+.settings summary{cursor:pointer;font:600 12px 'Space Grotesk';list-style:none;display:flex;justify-content:space-between}
+.settings summary::-webkit-details-marker{display:none}
+.settings-note{font-size:11px;line-height:1.5;color:var(--muted);margin:12px 0}
+.settings label{display:block;font-size:10px;color:#b7c2d8;margin-bottom:6px}
+.settings input{width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);background:#0a1222;color:white;outline:none}
+.settings input:focus{border-color:#8b7cff}
+.settings-actions{display:flex;gap:8px;margin-top:9px}
+.secondary-button{flex:1;padding:9px;border:1px solid #3a4664;border-radius:9px;background:#1a2540;color:#dce4ff;font-size:10px;cursor:pointer}
+.small-status{font-size:10px;color:var(--cyan);margin-top:8px;min-height:12px}
+footer{margin-top:auto;padding-top:4px;display:flex;justify-content:space-between;color:#68758e;font-size:10px}
+footer span{color:#52607a}
+@media(max-width:300px){.suggestions{grid-template-columns:1fr}.app{padding:16px 12px}}

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Voice Browser Assistant</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand-mark">V</div>
+      <div>
+        <h1>Voice Assistant</h1>
+        <p>Your browser, under control.</p>
+      </div>
+      <span class="status-dot" id="statusDot" title="Ready"></span>
+    </header>
+
+    <section class="hero">
+      <div class="orb" id="orb"><span>⌁</span></div>
+      <h2 id="headline">What can I do for you?</h2>
+      <p id="subheadline">Tap the microphone and tell me what to open.</p>
+      <button class="mic-button" id="micButton" type="button">
+        <span id="micIcon">🎙</span><span id="micLabel">Start listening</span>
+      </button>
+      <div class="heard" id="heardText">Your voice command will appear here.</div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading"><h3>Try saying</h3><span>QUICK COMMANDS</span></div>
+      <div class="suggestions">
+        <button class="suggestion" data-command="Open GitHub">↗ Open GitHub</button>
+        <button class="suggestion" data-command="Open ChatGPT">✦ Open ChatGPT</button>
+        <button class="suggestion" data-command="Open GitHub and YouTube">▣ Open two tabs</button>
+        <button class="suggestion" data-command="Search Python async tutorial">⌕ Search Google</button>
+        <button class="suggestion" data-command="Close current tab">× Close current tab</button>
+        <button class="suggestion" data-command="Switch to next tab">⇄ Next tab</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading"><h3>Recent activity</h3><button class="text-button" id="clearHistory">Clear</button></div>
+      <div class="history" id="history"><p class="empty">Your commands will show up here.</p></div>
+    </section>
+
+    <details class="settings">
+      <summary>AI settings <span class="optional">OPTIONAL</span></summary>
+      <p class="settings-note">Local commands work without AI. Add a Gemini API key to understand more flexible requests. Your key is stored in this browser's extension storage.</p>
+      <label for="apiKey">Gemini API key</label>
+      <input id="apiKey" type="password" placeholder="Paste your API key">
+      <div class="settings-actions">
+        <button class="secondary-button" id="enableGemini">Enable Gemini access</button>
+        <button class="secondary-button" id="saveKey">Save key</button>
+      </div>
+      <p class="small-status" id="settingsStatus"></p>
+    </details>
+
+    <footer>Voice Browser Assistant <span>v1.0.0 · Runs locally</span></footer>
+  </main>
+  <script src="commands.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
