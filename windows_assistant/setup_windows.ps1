@@ -8,12 +8,17 @@ $ModelDir = Join-Path $Root "models\$ModelName"
 $ZipPath = Join-Path $env:TEMP "$ModelName.zip"
 
 Write-Host "Setting up Browser Assist Windows background listener..."
-if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
-    throw "Python 3.11 is required. Install it from https://www.python.org/downloads/release/python-3119/ and enable the Python launcher."
+$PythonCommand = Get-Command python -ErrorAction SilentlyContinue
+if (-not $PythonCommand) {
+    throw "Python was not found on PATH. Install Python 3.11 or 3.12 and enable Add Python to PATH."
 }
-py -3.11 --version
-if ($LASTEXITCODE -ne 0) { throw "Python 3.11 was not found. Install Python 3.11 and retry." }
-if (-not (Test-Path $Venv)) { py -3.11 -m venv $Venv }
+$BasePython = $PythonCommand.Source
+& $BasePython -c "import sys; raise SystemExit(0 if (3, 11) <= sys.version_info[:2] < (3, 13) else 1)"
+if ($LASTEXITCODE -ne 0) {
+    throw "Python 3.11 or 3.12 is required. The Python command found on PATH is not a supported version."
+}
+& $BasePython --version
+if (-not (Test-Path $Venv)) { & $BasePython -m venv $Venv }
 & $Python -m pip install --upgrade pip
 & $Python -m pip install -r (Join-Path $Root "requirements.txt")
 
