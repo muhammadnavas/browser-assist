@@ -113,7 +113,6 @@ def main():
             transcript = (json.loads(recognizer.Result()).get("text") or "").strip()
             if not transcript:
                 continue
-            logging.info("Recognised speech: %s", transcript)
             command = parse_command(transcript)
             if not command:
                 continue
