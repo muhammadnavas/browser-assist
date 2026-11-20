@@ -39,9 +39,41 @@ def build_command_grammar():
         "remove tab", "remove the tab", "remove current tab",
         "next tab", "switch to next tab", "previous tab", "switch to previous tab",
         "last tab", "search", "search for", "search google for",
-        "google search for", "[unk]",
+        "google search for",
+        "next one four three", "next one forty three",
+        "next one hundred forty three", "next one hundred and forty three",
+        "next one forty tree", "next one four tree", "next 143",
+        "[unk]",
     })
     return json.dumps(sorted(phrases))
+
+
+# Vosk may render the spoken digits as words rather than numerals.
+WAKE_VARIANTS = {
+    "143",
+    "one four three",
+    "one four tree",
+    "one forty three",
+    "one forty tree",
+    "one hundred forty three",
+    "one hundred and forty three",
+}
+
+
+def build_wake_grammar():
+    """Recognize only the wake phrase while the assistant is in standby."""
+    return json.dumps(sorted(WAKE_VARIANTS | {"[unk]"}))
+
+
+def is_wake_phrase(transcript):
+    return " ".join((transcript or "").lower().split()) in WAKE_VARIANTS
+
+
+def is_close_wake_phrase(transcript):
+    normalized = " ".join((transcript or "").lower().split())
+    if not normalized.startswith("next "):
+        return False
+    return normalized[5:] in WAKE_VARIANTS
 
 APP_DIR.mkdir(parents=True, exist_ok=True)
 _file_handler = RotatingFileHandler(
@@ -149,20 +181,49 @@ def main():
     if mutex_handle is None:
         return
 
-    logging.info("Starting continuous voice assistant.")
+    logging.info("Starting Browser Assist in 143 standby mode.")
     model = Model(str(MODEL_DIR))
-    # The constrained recognizer improves accuracy for known browser commands.
-    # Keep a second unrestricted recognizer so free-form Google searches still work.
-    command_recognizer = KaldiRecognizer(model, SAMPLE_RATE, build_command_grammar())
-    general_recognizer = KaldiRecognizer(model, SAMPLE_RATE)
-    command_recognizer.SetWords(False)
-    general_recognizer.SetWords(False)
-    print("Browser Assist is listening continuously. Press Ctrl+C to stop.")
+
+    # Standby uses one small, constrained recognizer. The active recognizers are
+    # created only after the wake phrase is heard.
+    wake_recognizer = KaldiRecognizer(model, SAMPLE_RATE, build_wake_grammar())
+    wake_recognizer.SetWords(False)
+    active = False
+    command_recognizer = None
+    general_recognizer = None
+
+    print('Browser Assist is in standby. Say "143" to activate; say "next 143" to deactivate.')
 
     with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=8000, dtype="int16",
                            channels=1, callback=audio_callback):
         while True:
             audio = AUDIO_QUEUE.get()
+
+            if not active:
+                if wake_recognizer.AcceptWaveform(audio):
+                    transcript = (
+                        json.loads(wake_recognizer.Result()).get("text") or ""
+                    ).strip()
+                    if transcript:
+                        logging.info("RECOGNIZED [standby]: %s", transcript)
+                    if is_wake_phrase(transcript):
+                        active = True
+                        command_recognizer = KaldiRecognizer(
+                            model, SAMPLE_RATE, build_command_grammar()
+                        )
+                        general_recognizer = KaldiRecognizer(model, SAMPLE_RATE)
+                        command_recognizer.SetWords(False)
+                        general_recognizer.SetWords(False)
+                        wake_recognizer = None
+                        while not AUDIO_QUEUE.empty():
+                            try:
+                                AUDIO_QUEUE.get_nowait()
+                            except queue.Empty:
+                                break
+                        logging.info('Wake phrase "143" detected; Browser Assist activated.')
+                        print("Browser Assist active.")
+                continue
+
             command = None
             grammar_command = None
             general_command = None
@@ -185,13 +246,29 @@ def main():
                     logging.info("RECOGNIZED [general]: %s", general_transcript)
                     general_command = parse_command(general_transcript)
 
-            # The two recognizers finalize speech at different times, so requiring
-            # agreement on every audio block drops valid commands. Prefer the
-            # constrained command grammar; use general recognition as a fallback.
+            # "next 143" returns to standby before the normal command parser runs.
+            if is_close_wake_phrase(command_transcript) or is_close_wake_phrase(general_transcript):
+                active = False
+                command_recognizer = None
+                general_recognizer = None
+                wake_recognizer = KaldiRecognizer(
+                    model, SAMPLE_RATE, build_wake_grammar()
+                )
+                wake_recognizer.SetWords(False)
+                while not AUDIO_QUEUE.empty():
+                    try:
+                        AUDIO_QUEUE.get_nowait()
+                    except queue.Empty:
+                        break
+                logging.info('Close phrase "next 143" detected; Browser Assist returned to standby.')
+                print("Browser Assist in standby.")
+                continue
+
+            # Prefer the constrained grammar, with unrestricted recognition as
+            # a fallback for free-form Google searches.
             command = grammar_command or general_command
 
-            # If both recognizers independently produce valid but different
-            # website commands in the same processing cycle, reject the ambiguity.
+            # Reject conflicting website names heard by the two recognizers.
             if (
                 grammar_command
                 and general_command
