@@ -34,3 +34,4 @@ grantBtn.addEventListener("click", requestMic);
 window.addEventListener("DOMContentLoaded", () => {
   requestMic();
 });
+
